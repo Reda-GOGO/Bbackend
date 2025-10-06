@@ -2,6 +2,10 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// PORT=3000
+// JWT_SECRET=thisistopsecrettoken
+// NODE_ENV=development
+
 const randomNumber = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
