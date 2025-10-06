@@ -1,0 +1,126 @@
+generator client {
+        provider = "prisma-client-js"
+}
+
+datasource db {
+        provider = "sqlite"
+        url      = "file:./database.db"
+}
+
+model User {
+        id        Int      @id @default(autoincrement())
+        name      String
+        email     String   @unique
+        password  String
+        createdAt DateTime @default(now())
+        role      Role     @relation(fields: [roleId], references: [id])
+        roleId    Int
+        orders    Order[]
+        archived  Boolean  @default(false)
+}
+
+model Role {
+        id          Int          @id @default(autoincrement())
+        jobTitle    String
+        description String?
+        users       User[]
+        Permission  Permission[]
+}
+
+model Permission {
+        id        Int       @id @default(autoincrement())
+        resource  String
+        action    String
+        role      Int
+        roles     Role      @relation(fields: [role], references: [id])
+        createdAt DateTime  @default(now())
+        updatedAt DateTime?
+}
+
+model Product {
+        id                Int           @id @default(autoincrement())
+        name              String
+        handle            String        @unique
+        image             String?
+        description       String?
+        cost              Float
+        price             Float
+        unit              String // Default/base unit
+        inventoryUnit     String
+        inventoryQuantity Float
+        orderItems        OrderItem[]
+        vendorName        String?
+        vendorContact     String?
+        units             ProductUnit[]
+        createdAt         DateTime      @default(now())
+        updatedAt         DateTime?
+        archived          Boolean       @default(false)
+}
+
+model ProductUnit {
+        id             Int         @id @default(autoincrement())
+        product        Product     @relation(fields: [productId], references: [id])
+        productId      Int
+        name           String // e.g., "packet", "kg", "piece"
+        quantityInBase Float // e.g., 25 (means 1 packet = 25kg)
+        price          Float // Selling price per unit
+        createdAt      DateTime    @default(now())
+        updatedAt      DateTime?
+        OrderItem      OrderItem[]
+        archived       Boolean     @default(false)
+}
+
+model Order {
+        id                Int         @id @default(autoincrement())
+        items             OrderItem[] @relation("OrderItems")
+        totalAmount       Float
+        totalAmountString String
+        status            String      @default("Pending")
+        type              String
+        createdAt         DateTime    @default(now())
+        updatedAt         DateTime?
+        invoice           Invoice?
+        customer          Customer    @relation(fields: [customerId], references: [id])
+        customerId        Int
+        user              User        @relation(fields: [createdBy], references: [id])
+        createdBy         Int
+        archived          Boolean     @default(false)
+}
+
+model OrderItem {
+        id           Int          @id @default(autoincrement())
+        name         String
+        quantity     Float // Quantity sold (can be partial)
+        price        Float // Price per unit at time of sale
+        unit         String // Unit used for this sale (e.g., "kg", "packet")
+        productUnit  Int?
+        productUnits ProductUnit? @relation(fields: [productUnit], references: [id])
+        createdAt    DateTime     @default(now())
+        updatedAt    DateTime?
+        orderId      Int
+        order        Order        @relation(name: "OrderItems", fields: [orderId], references: [id])
+        productId    Int
+        products     Product      @relation(fields: [productId], references: [id])
+}
+
+model Invoice {
+        id        Int       @id @default(autoincrement())
+        order     Order     @relation(fields: [orderId], references: [id])
+        orderId   Int       @unique
+        createdAt DateTime  @default(now())
+        updatedAt DateTime?
+        archived  Boolean   @default(false)
+}
+
+model Customer {
+        id        Int       @id @default(autoincrement())
+        name      String
+        ice       String?
+        email     String?
+        phone     String?
+        address   String?
+        createdAt DateTime  @default(now())
+        updatedAt DateTime?
+        orders    Order[]
+        archived  Boolean   @default(false)
+}
