@@ -64,7 +64,7 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 30;
@@ -106,16 +106,17 @@ router.get("/", async (req, res) => {
       totalCount,
     });
   } catch (err) {
-    console.error("Error fetching products:", err);
-    res.status(500).json({ error: "Failed to fetch products" });
+    next(err);
+    // console.error("Error fetching products:", err);
+    // res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 
-router.get("/:id", async (req, res) => {
-  const { id } = req.params;
+router.get("/:handle", async (req, res) => {
+  const { handle } = req.params;
   try {
     const product = await database.product.findUnique({
-      where: { id: Number(id) },
+      where: { handle: handle },
       include: {
         units: true,
       },

@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+import morgan from "morgan";
 import cookieParser from "cookie-parser";
+
 import user from "./routes/user.js";
 import product from "./routes/product.js";
 import customer from "./routes/customer.js";
@@ -17,12 +19,14 @@ const HOST = "0.0.0.0";
 server.set("json spaces", 2);
 server.use(express.json());
 server.use(cookieParser());
+server.use(morgan("dev"));
 server.use(
   cors({
     origin: [
       "http://localhost:4173",
       "http://192.168.11.108:5173",
       "http://192.168.11.114:5173",
+      "http://192.168.11.109:5173",
       "http://localhost:5173",
       "http://naoki-thinkpad-t490.local:5173",
       "http://192.168.43.68:5173",

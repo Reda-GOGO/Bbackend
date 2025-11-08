@@ -7,6 +7,10 @@ datasource db {
         url      = "file:./database.db"
 }
 
+//
+// USER, ROLES & PERMISSIONS
+//
+
 model User {
         id        Int      @id @default(autoincrement())
         name      String
@@ -24,59 +28,73 @@ model Role {
         jobTitle    String
         description String?
         users       User[]
-        Permission  Permission[]
+        permissions Permission[]
 }
 
 model Permission {
         id        Int       @id @default(autoincrement())
         resource  String
         action    String
-        role      Int
-        roles     Role      @relation(fields: [role], references: [id])
+        roleId    Int
+        role      Role      @relation(fields: [roleId], references: [id])
         createdAt DateTime  @default(now())
         updatedAt DateTime?
 }
 
+//
+// PRODUCTS, UNITS & INVENTORY
+//
+
 model Product {
-        id                Int           @id @default(autoincrement())
-        name              String
-        handle            String        @unique
-        image             String?
-        description       String?
-        cost              Float
-        price             Float
-        unit              String // Default/base unit
-        inventoryUnit     String
-        inventoryQuantity Float
-        orderItems        OrderItem[]
-        vendorName        String?
-        vendorContact     String?
-        units             ProductUnit[]
-        createdAt         DateTime      @default(now())
-        updatedAt         DateTime?
-        archived          Boolean       @default(false)
+        id            Int            @id @default(autoincrement())
+        name          String
+        handle        String         @unique
+        image         String?
+        description   String?
+        cost          Float
+        price         Float
+        unit          String // base unit (e.g., "kg", "piece")
+        vendorName    String?
+        vendorContact String?
+        units         ProductUnit[]
+        orderItems    OrderItem[]
+        stats         ProductStats[]
+        createdAt     DateTime       @default(now())
+        updatedAt     DateTime?
+        availableQty  Float          @default(0) // current stock in this unit
+        archived      Boolean        @default(false)
 }
 
 model ProductUnit {
         id             Int         @id @default(autoincrement())
         product        Product     @relation(fields: [productId], references: [id])
         productId      Int
-        name           String // e.g., "packet", "kg", "piece"
+        name           String // e.g., "packet", "box", "kg"
         quantityInBase Float // e.g., 25 (means 1 packet = 25kg)
-        price          Float // Selling price per unit
+        isBase         Boolean
+        price          Float // selling price per unit
+        cost           Float
         createdAt      DateTime    @default(now())
         updatedAt      DateTime?
-        OrderItem      OrderItem[]
+        orderItems     OrderItem[]
         archived       Boolean     @default(false)
 }
+
+//
+// ORDERS, ITEMS, CUSTOMERS & INVOICES
+//
 
 model Order {
         id                Int         @id @default(autoincrement())
         items             OrderItem[] @relation("OrderItems")
         totalAmount       Float
+        discount          Float?
+        profit            Float
+        partiallyPaidIn   Float?
         totalAmountString String
         status            String      @default("Pending")
         type              String
+        paymentMode       String?
         createdAt         DateTime    @default(now())
         updatedAt         DateTime?
         invoice           Invoice?
@@ -88,19 +106,22 @@ model Order {
 }
 
 model OrderItem {
-        id           Int          @id @default(autoincrement())
-        name         String
-        quantity     Float // Quantity sold (can be partial)
-        price        Float // Price per unit at time of sale
-        unit         String // Unit used for this sale (e.g., "kg", "packet")
-        productUnit  Int?
-        productUnits ProductUnit? @relation(fields: [productUnit], references: [id])
-        createdAt    DateTime     @default(now())
-        updatedAt    DateTime?
-        orderId      Int
-        order        Order        @relation(name: "OrderItems", fields: [orderId], references: [id])
-        productId    Int
-        products     Product      @relation(fields: [productId], references: [id])
+        id            Int          @id @default(autoincrement())
+        name          String
+        quantity      Float
+        unitPrice     Float
+        totalAmount   Float
+        unitProfit    Float // profit per unit
+        totalProfit   Float // total profit for this item
+        unit          String // e.g., "kg", "packet"
+        productUnitId Int?
+        productUnit   ProductUnit? @relation(fields: [productUnitId], references: [id])
+        productId     Int
+        product       Product      @relation(fields: [productId], references: [id])
+        orderId       Int
+        order         Order        @relation(name: "OrderItems", fields: [orderId], references: [id])
+        createdAt     DateTime     @default(now())
+        updatedAt     DateTime?
 }
 
 model Invoice {
@@ -123,4 +144,43 @@ model Customer {
         updatedAt DateTime?
         orders    Order[]
         archived  Boolean   @default(false)
+}
+
+//
+// ANALYTICS MODELS
+//
+
+model ProductStats {
+        id           Int         @id @default(autoincrement())
+        key          String
+        period       StatsPeriod
+        soldQuantity Float
+        soldRevenue  Float
+        soldProfit   Float
+        product      Product     @relation(fields: [productId], references: [id])
+        productId    Int
+        createdAt    DateTime    @default(now())
+
+        @@index([period, key, createdAt])
+}
+
+model SaleStats {
+        id          Int         @id @default(autoincrement())
+        key         String
+        period      StatsPeriod
+        totalAmount Float
+        profit      Float
+        createdAt   DateTime    @default(now())
+
+        @@index([period, key, createdAt])
+}
+
+//
+// ENUMS
+//
+
+enum StatsPeriod {
+        DAILY
+        WEEKLY
+        MONTHLY
 }

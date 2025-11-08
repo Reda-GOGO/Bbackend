@@ -2,6 +2,7 @@ import express from "express";
 import { upload } from "../middlewares/upload.js";
 
 import { database } from "../model/database.js";
+import { format, startOfWeek } from "date-fns";
 const router = express.Router({
   mergeParams: true,
 });
@@ -62,7 +63,7 @@ router.get("/", async (req, res) => {
         customer: true,
         items: {
           include: {
-            products: true,
+            product: true,
           },
         },
       },
@@ -96,7 +97,7 @@ router.get("/totalSale", async (req, res) => {
   }
 });
 
-router.get("/orderPerDay", async (req, res) => {
+router.get("/daily-stats", async (req, res) => {
   const start = req.params.start | "2025-09-24";
   const end = req.params.end | "2025-10-05";
   try {
@@ -105,15 +106,29 @@ router.get("/orderPerDay", async (req, res) => {
         archived: false,
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: "asc",
       },
     });
 
     const statsMap = {};
-
+    // function getDays(start, end) {
+    //   const days = [];
+    //   let current_day_date = new Date(start);
+    //   let current_day_string = current_day_date.toISOString().split("T")[0];
+    //   while (current_day_string !== end) {
+    //     days.push(current_day_string);
+    //     current_day_date.setDate(current_day_date.getDate() + 1);
+    //     current_day_string = current_day_date.toISOString().split("T")[0];
+    //   }
+    //   return days;
+    // }
     orders.forEach((order) => {
-      const date = order.createdAt.toISOString().split("T")[0]; // YYYY-MM-DD
-
+      const t_date = order.createdAt
+        .toISOString()
+        .split("T")[0]
+        .split("-")
+        .slice(0, -1); // YYYY-MM-DD
+      const date = t_date[0] + "-" + t_date[1];
       if (!statsMap[date]) {
         statsMap[date] = { orderCount: 0, totalIncome: 0, orders: [] };
       }
@@ -138,6 +153,49 @@ router.get("/orderPerDay", async (req, res) => {
   }
 });
 
+router.get("/weekly-stats", async (req, res) => {
+  try {
+    const orders = await database.order.findMany({
+      where: {
+        archived: false,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    const statsMap = {};
+
+    orders.forEach((order) => {
+      const orderDate = new Date(order.createdAt);
+
+      // Get the Monday (startOfWeek) of the week the order falls in
+      const weekStart = startOfWeek(orderDate, { weekStartsOn: 1 }); // 1 = Monday
+      const weekKey = format(weekStart, "yyyy-MM-dd"); // e.g. 2025-W41
+
+      if (!statsMap[weekKey]) {
+        statsMap[weekKey] = { orderCount: 0, totalIncome: 0, orders: [] };
+      }
+
+      statsMap[weekKey].orderCount += 1;
+      statsMap[weekKey].totalIncome += order.totalAmount;
+      statsMap[weekKey].orders.push(order.id);
+    });
+
+    const result = Object.entries(statsMap).map(([week, stats]) => ({
+      week, // e.g. "2025-W41"
+      orderCount: stats.orderCount,
+      totalIncome: parseFloat(stats.totalIncome.toFixed(2)),
+      orders: stats.orders,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      error: `Failed to fetch weekly stats: ${error.message}`,
+    });
+  }
+});
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {

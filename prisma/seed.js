@@ -1,10 +1,7 @@
 import { PrismaClient } from "@prisma/client";
+import { products } from "./productSeed.js";
 
 const prisma = new PrismaClient();
-
-// PORT=3000
-// JWT_SECRET=thisistopsecrettoken
-// NODE_ENV=development
 
 const randomNumber = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
@@ -49,7 +46,10 @@ const sampleVendors = [
   { name: "Vendor B", contact: "0623456789" },
   { name: "Vendor C", contact: "0634567890" },
 ];
-
+const genRanHex = (size) =>
+  [...Array(size)]
+    .map(() => Math.floor(Math.random() * 16).toString(16))
+    .join("");
 async function main() {
   const admin_role = await prisma.role.create({
     data: {
@@ -67,7 +67,7 @@ async function main() {
     data: {
       name: "Youssef",
       email: "youssef@test.com",
-      password: "gccprogram",
+      password: "....",
       roleId: admin_role.id,
     },
   });
@@ -76,54 +76,29 @@ async function main() {
     data: {
       name: "Eddy",
       email: "eddy@test.com",
-      password: "gccprogram",
+      password: "....",
       roleId: user_role.id,
     },
   });
-  for (let i = 1; i <= sampleProductsName.length; i++) {
-    const baseUnit = sampleUnits[randomNumber(0, sampleUnits.length - 1)];
-    const additionalUnit =
-      Math.random() > 0.5
-        ? sampleUnits[randomNumber(0, sampleUnits.length - 1)]
-        : null;
 
-    const vendor = sampleVendors[randomNumber(0, sampleVendors.length - 1)];
-
-    const product = await prisma.product.create({
-      data: {
-        name: `${sampleProductsName[i - 1]}`,
-        handle: `product-${i}`,
-        description: `Description for product ${i}`,
-        cost: randomNumber(50, 200),
-        price: randomNumber(201, 500),
-        unit: baseUnit.name,
-        vendorName: vendor.name,
-        vendorContact: vendor.contact,
-        inventoryUnit: baseUnit.name,
-        inventoryQuantity: randomNumber(50, 300),
-        // units: {
-        //   create: [
-        //     {
-        //       name: baseUnit.name,
-        //       quantityInBase: baseUnit.quantityInBase,
-        //       price: randomNumber(100, 300),
-        //     },
-        //     ...(additionalUnit
-        //       ? [
-        //         {
-        //           name: additionalUnit.name,
-        //           quantityInBase: additionalUnit.quantityInBase,
-        //           price: randomNumber(20, 150),
-        //         },
-        //       ]
-        //       : []),
-        //   ],
-        // },
-      },
-    });
-
-    console.log(`Created: ${product.name}`);
-  }
+  await Promise.all(
+    products.map(async (product) => {
+      const p = await prisma.product.create({
+        data: {
+          name: product.name,
+          handle: genRanHex(16),
+          image: product.image,
+          description: product.description,
+          cost: product.cost,
+          price: product.price,
+          unit: product.unit,
+          vendorName: product.vendorName,
+          vendorContact: product.vendorContact,
+        },
+      });
+      console.log(`✅ Created: ${p.name}`);
+    }),
+  );
 }
 
 main()
