@@ -17,8 +17,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       unit,
       vendorName,
       vendorContact,
-      inventoryUnit,
-      inventoryQuantity,
+      availableQty,
       units, // should be JSON string from frontend
     } = req.body;
 
@@ -43,8 +42,7 @@ router.post("/", upload.single("image"), async (req, res) => {
         unit,
         vendorName,
         vendorContact,
-        inventoryUnit,
-        inventoryQuantity: parseFloat(inventoryQuantity),
+        availableQty: parseFloat(availableQty),
         image,
         units: {
           create: parsedUnits.map((u) => ({
@@ -69,11 +67,13 @@ router.get("/", async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 30;
     const search = req.query.search ? req.query.search.trim() : "";
-
+    const sort_by = req.query.sort_by || "name";
+    const sort_direction = req.query.sort_direction || "asc";
+    const filter_by = req.query.filter_by || "all";
     const skip = (page - 1) * limit;
 
     // where clause for search
-    const where = search
+    let where = search
       ? {
         OR: [
           { name: { contains: search } },
@@ -82,7 +82,16 @@ router.get("/", async (req, res, next) => {
         ],
       }
       : {};
-
+    switch (filter_by) {
+      case "active":
+        where = { ...where, archived: false };
+        break;
+      case "archived":
+        where = { ...where, archived: true };
+        break;
+      case "all":
+        break;
+    }
     // fetch total count for pagination
     const totalCount = await database.product.count({ where });
 
@@ -95,13 +104,14 @@ router.get("/", async (req, res, next) => {
         units: true,
       },
       orderBy: {
-        createdAt: "desc",
+        [sort_by]: sort_direction,
       },
     });
 
     res.json({
       products: products || [],
       totalPages: Math.ceil(totalCount / limit),
+      totalProducts: totalCount,
       currentPage: page,
       totalCount,
     });
@@ -119,6 +129,7 @@ router.get("/:handle", async (req, res) => {
       where: { handle: handle },
       include: {
         units: true,
+        stats: true,
       },
     });
 
@@ -161,7 +172,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     // Find the existing product
     const existingProduct = await database.product.findUnique({
-      where: { id: Number(id) },
+      where: { handle: id },
     });
 
     if (!existingProduct) {
@@ -170,7 +181,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     // Update the product data
     const updatedProduct = await database.product.update({
-      where: { id: Number(id) },
+      where: { handle: id },
       data: {
         name,
         handle,

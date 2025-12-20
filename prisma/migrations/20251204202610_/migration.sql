@@ -4,6 +4,7 @@ CREATE TABLE "User" (
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
+    "language" TEXT NOT NULL DEFAULT 'EN',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "roleId" INTEGER NOT NULL,
     "archived" BOOLEAN NOT NULL DEFAULT false,
@@ -65,8 +66,11 @@ CREATE TABLE "ProductUnit" (
 CREATE TABLE "Order" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "totalAmount" REAL NOT NULL,
+    "tax" REAL NOT NULL,
+    "totalAmountWithTax" REAL NOT NULL,
     "discount" REAL,
     "profit" REAL NOT NULL,
+    "partiallyPaidIn" REAL,
     "totalAmountString" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'Pending',
     "type" TEXT NOT NULL,
@@ -129,6 +133,7 @@ CREATE TABLE "ProductStats" (
     "key" TEXT NOT NULL,
     "period" TEXT NOT NULL,
     "soldQuantity" REAL NOT NULL,
+    "saleNumber" REAL NOT NULL,
     "soldRevenue" REAL NOT NULL,
     "soldProfit" REAL NOT NULL,
     "productId" INTEGER NOT NULL,
@@ -142,6 +147,8 @@ CREATE TABLE "SaleStats" (
     "key" TEXT NOT NULL,
     "period" TEXT NOT NULL,
     "totalAmount" REAL NOT NULL,
+    "totalAmountWithTax" REAL NOT NULL,
+    "totalOrders" REAL NOT NULL,
     "profit" REAL NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -156,7 +163,7 @@ CREATE UNIQUE INDEX "Product_handle_key" ON "Product"("handle");
 CREATE UNIQUE INDEX "Invoice_orderId_key" ON "Invoice"("orderId");
 
 -- CreateIndex
-CREATE INDEX "ProductStats_period_key_idx" ON "ProductStats"("period", "key");
+CREATE INDEX "ProductStats_period_key_createdAt_idx" ON "ProductStats"("period", "key", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "SaleStats_period_key_idx" ON "SaleStats"("period", "key");
+CREATE INDEX "SaleStats_period_key_createdAt_idx" ON "SaleStats"("period", "key", "createdAt");
