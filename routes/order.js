@@ -216,12 +216,47 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 30;
+    const search = req.query.search ? req.query.search.trim() : "";
+    const sort_by = req.query.sort_by || "createdAt";
+    const sort_direction = req.query.sort_direction || "desc";
+    const filter_by = req.query.filter_by || "active";
+
+    const skip = (page - 1) * limit;
+
+    // where clause for search
+    let where = search
+      ? {
+        OR: [
+          // { id: { contains: search } },
+          { customer: { name: { contains: search } } },
+        ],
+      }
+      : {};
+
+    // filter logic
+    switch (filter_by) {
+      case "active":
+        where = { ...where, archived: false };
+        break;
+      case "archived":
+        where = { ...where, archived: true };
+        break;
+      case "all":
+        break;
+    }
+
+    // total count for pagination
+    const totalCount = await database.order.count({ where });
+
+    // fetch paginated orders
     const orders = await database.order.findMany({
-      where: {
-        archived: false,
-      },
+      where,
+      skip,
+      take: limit,
       include: {
         customer: true,
         items: {
@@ -231,13 +266,19 @@ router.get("/", async (req, res) => {
         },
       },
       orderBy: {
-        createdAt: "desc",
+        [sort_by]: sort_direction,
       },
     });
-    res.status(200).json({ orders });
-  } catch (error) {
-    console.log("Failed to fetch orders ...", error);
-    res.status(500).json({ error: "Failed to fetch orders ..." });
+
+    res.json({
+      orders: orders || [],
+      totalPages: Math.ceil(totalCount / limit),
+      totalOrders: totalCount,
+      currentPage: page,
+      totalCount,
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
