@@ -18,18 +18,10 @@ router.post("/", upload.single("image"), async (req, res) => {
       vendorName,
       vendorContact,
       availableQty,
-      units, // should be JSON string from frontend
+      units,
     } = req.body;
 
-    let parsedUnits = [];
-    if (units) {
-      try {
-        parsedUnits = JSON.parse(units);
-      } catch (err) {
-        return res.status(400).json({ error: "Invalid units format" });
-      }
-    }
-
+    const parsedUnits = units ? JSON.parse(units) : [];
     const image = req.file ? `/uploads/${req.file.filename}` : null;
 
     const product = await database.product.create({
@@ -42,13 +34,16 @@ router.post("/", upload.single("image"), async (req, res) => {
         unit,
         vendorName,
         vendorContact,
-        availableQty: parseFloat(availableQty),
+        availableQty: parseFloat(availableQty || 0),
         image,
+
         units: {
           create: parsedUnits.map((u) => ({
             name: u.name,
-            quantityInBase: parseFloat(u.conversion || u.quantityInBase),
-            price: parseFloat(u.price),
+            quantityInBase: Number(u.conversion),
+            price: Number(u.price),
+            cost: Number(cost),
+            isBase: u.name === unit,
           })),
         },
       },
