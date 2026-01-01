@@ -24,27 +24,52 @@ router.post("/", upload.single("image"), async (req, res) => {
     const parsedUnits = units ? JSON.parse(units) : [];
     const image = req.file ? `/uploads/${req.file.filename}` : null;
 
+    const numericCost = Number(cost);
+    const numericPrice = Number(price);
+
+    const safeUnits = parsedUnits.map((u) => {
+      const defaultValue = Number(u.defaultValue);
+      const variantValue = Number(u.variantValue);
+
+      // 🧠 base unit rule
+      const isBase = u.name === unit;
+
+      const quantityInBase = isBase
+        ? 1
+        : defaultValue > 0 && variantValue > 0
+          ? variantValue / defaultValue
+          : null;
+
+      if (!Number.isFinite(quantityInBase)) {
+        throw new Error(`Invalid quantityInBase for unit "${u.name}"`);
+      }
+
+      return {
+        name: u.name,
+        quantityInBase,
+        defaultValue: isBase ? 1 : defaultValue,
+        variantValue: isBase ? 1 : variantValue,
+        price: Number(u.price),
+        cost: numericCost,
+        isBase,
+      };
+    });
+
     const product = await database.product.create({
       data: {
         name,
         handle,
         description,
-        cost: parseFloat(cost),
-        price: parseFloat(price),
+        cost: numericCost,
+        price: numericPrice,
         unit,
         vendorName,
         vendorContact,
-        availableQty: parseFloat(availableQty || 0),
+        availableQty: Number(availableQty || 0),
         image,
 
         units: {
-          create: parsedUnits.map((u) => ({
-            name: u.name,
-            quantityInBase: Number(u.conversion),
-            price: Number(u.price),
-            cost: Number(cost),
-            isBase: u.name === unit,
-          })),
+          create: safeUnits,
         },
       },
       include: { units: true },
@@ -52,8 +77,10 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     res.status(201).json(product);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to create product" });
+    console.error("CREATE PRODUCT ERROR:", error);
+    res
+      .status(400)
+      .json({ error: error.message || "Failed to create product" });
   }
 });
 
@@ -137,8 +164,9 @@ router.get("/:handle", async (req, res) => {
   }
 });
 
-router.put("/:id", upload.single("image"), async (req, res) => {
-  const { id } = req.params;
+router.put("/:handle", upload.single("image"), async (req, res) => {
+  const { handle } = req.params;
+
   try {
     const {
       name,
@@ -149,11 +177,11 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       unit,
       vendorName,
       vendorContact,
-      inventoryUnit,
-      inventoryQuantity,
+      availableQty,
       units, // should be JSON string from frontend
     } = req.body;
 
+    // Parse units safely
     let parsedUnits = [];
     if (units) {
       try {
@@ -165,42 +193,45 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     const image = req.file ? `/uploads/${req.file.filename}` : null;
 
-    // Find the existing product
+    // Find existing product
     const existingProduct = await database.product.findUnique({
-      where: { handle: id },
+      where: { handle },
+      include: { units: true },
     });
 
     if (!existingProduct) {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    // Update the product data
+    // Update product
     const updatedProduct = await database.product.update({
-      where: { handle: id },
+      where: { handle },
       data: {
         name,
-        handle,
+        handle: handle,
         description,
         cost: parseFloat(cost),
         price: parseFloat(price),
         unit,
         vendorName,
         vendorContact,
-        inventoryUnit,
-        inventoryQuantity: parseFloat(inventoryQuantity),
-        image: image || existingProduct.image, // Keep the old image if not updated
+        availableQty: parseFloat(availableQty || "0"),
+        image: image || existingProduct.image,
+        // Delete existing units and recreate
         units: {
-          deleteMany: {}, // First, delete existing units
+          deleteMany: {},
           create: parsedUnits.map((u) => ({
             name: u.name,
-            quantityInBase: parseFloat(u.conversion || u.quantityInBase),
-            price: parseFloat(u.price),
+            quantityInBase: parseFloat(u.quantityInBase || u.conversion || "1"),
+            defaultValue: parseFloat(u.defaultValue || "1"),
+            variantValue: parseFloat(u.variantValue || "1"),
+            price: parseFloat(u.price || "0"),
+            cost: parseFloat(u.cost || "0"),
+            isBase: u.isBase || false,
           })),
         },
       },
-      include: {
-        units: true, // Include updated units
-      },
+      include: { units: true },
     });
 
     res.json(updatedProduct);

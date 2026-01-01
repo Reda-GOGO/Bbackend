@@ -73,6 +73,8 @@ model ProductUnit {
         name           String // e.g., "packet", "box", "kg"
         quantityInBase Float // e.g., 25 (means 1 packet = 25kg)
         isBase         Boolean
+        defaultValue   Float
+        variantValue   Float
         price          Float // selling price per unit
         cost           Float
         createdAt      DateTime    @default(now())
