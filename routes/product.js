@@ -203,12 +203,27 @@ router.put("/:handle", upload.single("image"), async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
+    // Split incoming units
+    const baseUnit = parsedUnits.find((u) => u.isBase);
+    const variantUnits = parsedUnits.filter((u) => !u.isBase);
+
+    // Existing variant names in DB
+    const existingVariantNames = existingProduct.units
+      .filter((u) => !u.isBase)
+      .map((u) => u.name);
+
+    // Incoming variant names
+    const incomingVariantNames = variantUnits.map((u) => u.name);
+
+    // Variants removed in frontend
+    const removedVariantNames = existingVariantNames.filter(
+      (name) => !incomingVariantNames.includes(name),
+    );
     // Update product
     const updatedProduct = await database.product.update({
       where: { handle },
       data: {
         name,
-        handle: handle,
         description,
         cost: parseFloat(cost),
         price: parseFloat(price),
@@ -217,18 +232,55 @@ router.put("/:handle", upload.single("image"), async (req, res) => {
         vendorContact,
         availableQty: parseFloat(availableQty || "0"),
         image: image || existingProduct.image,
-        // Delete existing units and recreate
+
         units: {
-          deleteMany: {},
-          create: parsedUnits.map((u) => ({
-            name: u.name,
-            quantityInBase: parseFloat(u.quantityInBase || u.conversion || "1"),
-            defaultValue: parseFloat(u.defaultValue || "1"),
-            variantValue: parseFloat(u.variantValue || "1"),
-            price: parseFloat(u.price || "0"),
-            cost: parseFloat(u.cost || "0"),
-            isBase: u.isBase || false,
+          // 1️⃣ delete removed variants only
+          deleteMany: {
+            name: { in: removedVariantNames },
+            isBase: false,
+          },
+
+          // 2️⃣ upsert variants (update if exists, create if new)
+          upsert: variantUnits.map((u) => ({
+            where: {
+              productId_name: {
+                productId: existingProduct.id,
+                name: u.name,
+              },
+            },
+            update: {
+              quantityInBase: Number(u.quantityInBase),
+              defaultValue: Number(u.defaultValue),
+              variantValue: Number(u.variantValue),
+              price: Number(u.price),
+              cost: Number(u.cost),
+            },
+            create: {
+              name: u.name,
+              quantityInBase: Number(u.quantityInBase),
+              defaultValue: Number(u.defaultValue),
+              variantValue: Number(u.variantValue),
+              price: Number(u.price),
+              cost: Number(u.cost),
+              isBase: false,
+            },
           })),
+
+          // 3️⃣ update base unit ONLY (never recreate)
+          update: baseUnit
+            ? {
+              where: {
+                productId_name: {
+                  productId: existingProduct.id,
+                  name: baseUnit.name,
+                },
+              },
+              data: {
+                price: Number(baseUnit.price),
+                cost: Number(baseUnit.cost),
+              },
+            }
+            : undefined,
         },
       },
       include: { units: true },

@@ -3,4 +3,5 @@ node_modules
 
 /prisma/script.js
 /prisma/productSeed.js
+/prisma/database.db
 data.txt

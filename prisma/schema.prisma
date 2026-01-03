@@ -81,6 +81,8 @@ model ProductUnit {
         updatedAt      DateTime?
         orderItems     OrderItem[]
         archived       Boolean     @default(false)
+
+        @@unique([productId, name])
 }
 
 //
