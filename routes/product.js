@@ -87,7 +87,7 @@ router.post("/", upload.single("image"), async (req, res) => {
 router.get("/", async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 30;
+    const limit = parseInt(req.query.limit) || 300;
     const search = req.query.search ? req.query.search.trim() : "";
     const sort_by = req.query.sort_by || "name";
     const sort_direction = req.query.sort_direction || "asc";
@@ -95,15 +95,23 @@ router.get("/", async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     // where clause for search
-    let where = search
-      ? {
-        OR: [
-          { name: { contains: search } },
-          { handle: { contains: search } },
-          { vendorName: { contains: search } },
-        ],
-      }
-      : {};
+    let where = {
+      name: {
+        not: "",
+      },
+    };
+
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: search } },
+            { handle: { contains: search } },
+            { vendorName: { contains: search } },
+          ],
+        },
+      ];
+    }
     switch (filter_by) {
       case "active":
         where = { ...where, archived: false };
