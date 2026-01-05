@@ -12,16 +12,17 @@ datasource db {
 //
 
 model User {
-        id        Int      @id @default(autoincrement())
+        id        Int        @id @default(autoincrement())
         name      String
-        email     String   @unique
+        email     String     @unique
         password  String
-        language  String   @default("EN")
-        createdAt DateTime @default(now())
-        role      Role     @relation(fields: [roleId], references: [id])
+        language  String     @default("EN")
+        createdAt DateTime   @default(now())
+        role      Role       @relation(fields: [roleId], references: [id])
         roleId    Int
         orders    Order[]
-        archived  Boolean  @default(false)
+        archived  Boolean    @default(false)
+        Timeline  Timeline[]
 }
 
 model Role {
@@ -110,6 +111,7 @@ model Order {
         user               User        @relation(fields: [createdBy], references: [id])
         createdBy          Int
         archived           Boolean     @default(false)
+        Timeline           Timeline?
 }
 
 model OrderItem {
@@ -135,6 +137,19 @@ model Invoice {
         id        Int       @id @default(autoincrement())
         order     Order     @relation(fields: [orderId], references: [id])
         orderId   Int       @unique
+        createdAt DateTime  @default(now())
+        updatedAt DateTime?
+        archived  Boolean   @default(false)
+}
+
+model Timeline {
+        id        Int       @id @default(autoincrement())
+        order     Order     @relation(fields: [orderId], references: [id])
+        orderId   Int       @unique
+        user      User      @relation(fields: [createdBy], references: [id])
+        action    String
+        content   String
+        createdBy Int
         createdAt DateTime  @default(now())
         updatedAt DateTime?
         archived  Boolean   @default(false)
