@@ -171,10 +171,12 @@ router.post("/", async (req, res) => {
       const createdOrder = await tx.order.create({
         data: {
           totalAmountString: totalInWords,
-          totalAmount: total_amount,
-          totalAmountWithTax: total_amount_with_tax,
+          totalAmount: parseFloat(parseFloat(total_amount).toFixed(2)),
+          totalAmountWithTax: parseFloat(
+            parseFloat(total_amount_with_tax).toFixed(2),
+          ),
           tax: 0.2,
-          profit: total_profit,
+          profit: parseFloat(parseFloat(total_profit).toFixed(2)),
           type,
           status,
           createdBy,

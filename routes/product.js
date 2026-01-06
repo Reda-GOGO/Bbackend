@@ -106,8 +106,8 @@ router.get("/", async (req, res, next) => {
         {
           OR: [
             { name: { contains: search } },
-            { handle: { contains: search } },
-            { vendorName: { contains: search } },
+            // { handle: { contains: search } },
+            // { vendorName: { contains: search } },
           ],
         },
       ];
