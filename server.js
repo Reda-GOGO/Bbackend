@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import user from "./routes/user.js";
 import product from "./routes/product.js";
 import customer from "./routes/customer.js";
+import collection from "./routes/collection.js";
 import order from "./routes/order.js";
 import productStats from "./routes/productStats.js";
 
@@ -49,6 +50,7 @@ server.use("/product", product);
 server.use("/customers", customer);
 server.use("/orders", order);
 server.use("/productStats", productStats);
+server.use("/collection", collection);
 
 server.post("/pdf", async (req, res) => {
   const { id, theme = "dark" } = req.body;
