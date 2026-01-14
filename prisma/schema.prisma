@@ -117,9 +117,11 @@ model Order {
         profit             Float
         partiallyPaidIn    Float?
         totalAmountString  String
-        status             String      @default("Pending")
+        status             String      @default("Pending") // Pending , PartiallyPaid , Paid , Cancelled 
         type               String
-        paymentMode        String?
+        paymentMode        String? // espèce , cheque , virement , effet , without
+        paymentRef         String?
+        orderRef           String?
         createdAt          DateTime    @default(now())
         updatedAt          DateTime?
         invoice            Invoice?
@@ -128,6 +130,7 @@ model Order {
         user               User        @relation(fields: [createdBy], references: [id])
         createdBy          Int
         archived           Boolean     @default(false)
+        deleted            Boolean     @default(false)
         Timeline           Timeline?
 }
 
@@ -147,6 +150,8 @@ model OrderItem {
         orderId       Int
         order         Order        @relation(name: "OrderItems", fields: [orderId], references: [id])
         createdAt     DateTime     @default(now())
+        archived      Boolean      @default(false)
+        deleted       Boolean      @default(false)
         updatedAt     DateTime?
 }
 

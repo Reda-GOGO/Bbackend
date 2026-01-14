@@ -233,7 +233,7 @@ router.get("/", async (req, res, next) => {
     let where = search
       ? {
         OR: [
-          // { id: { contains: search } },
+          // { id: Number(search) },
           { customer: { name: { contains: search } } },
         ],
       }
