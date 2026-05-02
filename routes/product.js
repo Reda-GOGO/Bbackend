@@ -84,74 +84,149 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
+
+// Helper to capitalize (optional)
+function capitalizeFirstLetter(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Helper to recursively convert BigInt -> Number
+function convertBigInt(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (Array.isArray(obj)) return obj.map(convertBigInt);
+  if (typeof obj === "object") {
+    const res = {};
+    for (const key in obj) {
+      res[key] = convertBigInt(obj[key]);
+    }
+    return res;
+  }
+  return obj;
+}
+
 router.get("/", async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 300;
+    const collection_name = req.query.collection_name
+      ? req.query.collection_name.trim()
+      : "";
+    const collection_handle = req.query.collection_handle
+      ? req.query.collection_handle.trim()
+      : "";
     const search = req.query.search ? req.query.search.trim() : "";
-    const sort_by = req.query.sort_by || "name";
-    const sort_direction = req.query.sort_direction || "asc";
     const filter_by = req.query.filter_by || "all";
     const skip = (page - 1) * limit;
+    const totalItems = await database.product.count();
 
-    // where clause for search
-    let where = {
-      name: {
-        not: "",
-      },
-    };
+    // Base filter for raw SQL
+    let filterConditions = `WHERE p."name" != ''`;
+    if (filter_by === "active") filterConditions += ` AND p."archived" = 0`;
+    if (filter_by === "archived") filterConditions += ` AND p."archived" = 1`;
+    if (collection_handle) filterConditions += ` AND c.handle = '${collection_handle}'`;
+
+    let products = [];
+    let totalCount = 0;
 
     if (search) {
-      where.AND = [
-        {
-          OR: [
-            { name: { contains: search } },
-            // { handle: { contains: search } },
-            // { vendorName: { contains: search } },
-          ],
-        },
-      ];
-    }
-    switch (filter_by) {
-      case "active":
-        where = { ...where, archived: false };
-        break;
-      case "archived":
-        where = { ...where, archived: true };
-        break;
-      case "all":
-        break;
-    }
-    // fetch total count for pagination
-    const totalCount = await database.product.count({ where });
+      const fuzzyPattern = `%${search.split("").join("%")}%`;
+      const startsWithPattern = `${search}%`;
 
-    // fetch paginated products
-    const products = await database.product.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        units: true,
-      },
-      orderBy: {
-        [sort_by]: sort_direction,
-      },
-    });
+      // Raw SQL search
+      const rawProducts = await database.$queryRawUnsafe(`
+        SELECT p.*, c.handle AS collectionHandle,
+          CASE 
+            WHEN LOWER(p."name") LIKE LOWER('${startsWithPattern}') THEN 1
+            WHEN LOWER(p."name") LIKE LOWER('% ${search}%') THEN 2
+            ELSE 3
+          END AS relevance
+        FROM "Product" p
+        LEFT JOIN "Collection" c ON p."collectionId" = c."id"
+        ${filterConditions} 
+        AND p."name" LIKE '${fuzzyPattern}'
+        ORDER BY relevance ASC, p."name" ASC
+        LIMIT ${limit} OFFSET ${skip}
+      `);
 
-    res.json({
-      products: products || [],
+      // Count query
+      const countResult = await database.$queryRawUnsafe(`
+        SELECT COUNT(*) AS count
+        FROM "Product" p
+        LEFT JOIN "Collection" c ON p."collectionId" = c."id"
+        ${filterConditions} 
+        AND p."name" LIKE '${fuzzyPattern}'
+      `);
+
+      const rawCount = countResult[0].count;
+      totalCount = typeof rawCount === "bigint" ? Number(rawCount) : rawCount || 0;
+
+      // Fetch units and collection data
+      const productIds = rawProducts.map((p) => p.id);
+      const productsWithUnits = await database.product.findMany({
+        where: { id: { in: productIds } },
+        include: { units: true, Collection: true },
+      });
+
+      // Merge rawProducts with Prisma hydrated units
+      products = rawProducts.map((rp) => {
+        const fullProduct = productsWithUnits.find((p) => p.id === rp.id) || {};
+        return convertBigInt({ ...rp, ...fullProduct });
+      });
+    } else {
+      // Prisma query without search
+      const where = { name: { not: "" } };
+      if (filter_by === "active") where.archived = false;
+      if (filter_by === "archived") where.archived = true;
+      if (collection_handle) {
+        where.Collection = { is: { handle: collection_handle } };
+      }
+
+      totalCount = await database.product.count({ where });
+      products = await database.product.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { units: true, Collection: true },
+        orderBy: { name: "asc" },
+      });
+
+      // Convert BigInt
+      products = convertBigInt(products);
+    }
+
+    return res.status(200).json({
+      products,
       totalPages: Math.ceil(totalCount / limit),
       totalProducts: totalCount,
-      currentPage: page,
       totalCount,
+      currentPage: page,
+      totalItems,
     });
   } catch (err) {
+    console.error("Search Error:", err);
     next(err);
-    // console.error("Error fetching products:", err);
-    // res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 
+
+router.get("/empty", async (req, res) => {
+  try {
+    const products = await database.product.findMany({
+      where: {
+        name: "",
+      },
+    });
+    if (products) {
+      res.status(200).json({ products });
+    } else {
+      res.status(401).json({ error: "Error fetching empty products" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: `Error server access :  ${error}` });
+  }
+});
 router.get("/:handle", async (req, res) => {
   const { handle } = req.params;
   try {
@@ -160,6 +235,7 @@ router.get("/:handle", async (req, res) => {
       include: {
         units: true,
         stats: true,
+        Collection: true,
       },
     });
 
@@ -301,6 +377,22 @@ router.put("/:handle", upload.single("image"), async (req, res) => {
   }
 });
 
+router.delete("/empty", async (req, res) => {
+  try {
+    const products = await database.product.deleteMany({
+      where: {
+        name: "",
+      },
+    });
+    if (products) {
+      res.status(200).json({ products });
+    } else {
+      res.status(401).json({ error: "Error fetching empty products" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: `Error server access :  ${error}` });
+  }
+});
 router.delete("/:id", async (req, res) => {
   const productId = req.params.id;
   try {

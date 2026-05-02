@@ -23,10 +23,13 @@ server.set("json spaces", 2);
 server.use(express.json());
 server.use(cookieParser());
 server.use(morgan("dev"));
+
 server.use(
   cors({
     origin: [
       "http://localhost:4173",
+      "http://localhost:5173",
+      "http://localhost:5678",
       "http://192.168.0.71:5173",
       "http://192.168.11.108:5173",
       "http://192.168.11.114:5173",
@@ -38,7 +41,7 @@ server.use(
       "http://192.168.1.10:4173",
       "http://192.168.11.109:5173",
       "http://192.168.11.247:5173",
-      "http://localhost:5173",
+      "http://localhost:5175",
       "http://naoki-thinkpad-t490.local:5173",
       "http://192.168.43.68:5173",
       "http://192.168.1.147:5173",
