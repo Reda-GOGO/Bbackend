@@ -264,6 +264,7 @@ router.get("/", async (req, res, next) => {
         items: {
           include: {
             product: true,
+            productUnit: true,
           },
         },
       },
@@ -298,6 +299,7 @@ router.get("/:id", async (req, res) => {
         items: {
           include: {
             product: true,
+            productUnit: true,
           },
         },
       },

@@ -5,3 +5,4 @@ node_modules
 /prisma/productSeed.js
 # /prisma/database.db
 data.txt
+message.txt
