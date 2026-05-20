@@ -48,25 +48,37 @@ model Permission {
 //
 
 model Product {
-        id            Int            @id @default(autoincrement())
-        name          String
-        handle        String         @unique
-        image         String?
-        description   String?
-        cost          Float
-        price         Float
-        unit          String // base unit (e.g., "kg", "piece")
-        vendorName    String?
-        vendorContact String?
-        units         ProductUnit[]
-        orderItems    OrderItem[]
-        stats         ProductStats[]
-        createdAt     DateTime       @default(now())
-        updatedAt     DateTime?
-        availableQty  Float          @default(0) // current stock in this unit
-        archived      Boolean        @default(false)
-        Collection    Collection?    @relation(fields: [collectionId], references: [id])
-        collectionId  Int?
+        id             Int              @id @default(autoincrement())
+        name           String
+        handle         String           @unique
+        image          String?
+        description    String?
+        cost           Float
+        price          Float
+        unit           String // base unit (e.g., "kg", "piece")
+        vendorName     String?
+        vendorContact  String?
+        units          ProductUnit[]
+        orderItems     OrderItem[]
+        stats          ProductStats[]
+        createdAt      DateTime         @default(now())
+        updatedAt      DateTime?
+        availableQty   Float            @default(0) // current stock in this unit
+        storageHistory StorageHistory[]
+        archived       Boolean          @default(false)
+        Collection     Collection?      @relation(fields: [collectionId], references: [id])
+        collectionId   Int?
+}
+
+model StorageHistory {
+        id        Int       @id @default(autoincrement())
+        quantity  Float
+        unit      String
+        createdAt DateTime  @default(now())
+        updatedAt DateTime?
+        archived  Boolean   @default(false)
+        product   Product?  @relation(fields: [productId], references: [id], onDelete: Cascade)
+        productId Int?
 }
 
 model ProductUnit {
@@ -100,7 +112,8 @@ model Collection {
         archived    Boolean  @default(false)
 
         // Many-to-many relationship
-        products Product[]
+        products        Product[]
+        CollectionStats CollectionStats[]
 }
 
 //
@@ -155,15 +168,6 @@ model OrderItem {
         updatedAt     DateTime?
 }
 
-model Invoice {
-        id        Int       @id @default(autoincrement())
-        order     Order     @relation(fields: [orderId], references: [id])
-        orderId   Int       @unique
-        createdAt DateTime  @default(now())
-        updatedAt DateTime?
-        archived  Boolean   @default(false)
-}
-
 model Timeline {
         id        Int       @id @default(autoincrement())
         order     Order     @relation(fields: [orderId], references: [id])
@@ -187,6 +191,15 @@ model Customer {
         createdAt DateTime  @default(now())
         updatedAt DateTime?
         orders    Order[]
+        archived  Boolean   @default(false)
+}
+
+model Invoice {
+        id        Int       @id @default(autoincrement())
+        order     Order     @relation(fields: [orderId], references: [id])
+        orderId   Int       @unique
+        createdAt DateTime  @default(now())
+        updatedAt DateTime?
         archived  Boolean   @default(false)
 }
 
@@ -218,6 +231,20 @@ model SaleStats {
         totalOrders        Float
         profit             Float
         createdAt          DateTime    @default(now())
+
+        @@index([period, key, createdAt])
+}
+
+model CollectionStats {
+        id           Int         @id @default(autoincrement())
+        key          String
+        period       StatsPeriod
+        saleNumber   Float
+        soldRevenue  Float
+        soldProfit   Float
+        collection   Collection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+        collectionId Int
+        createdAt    DateTime    @default(now())
 
         @@index([period, key, createdAt])
 }

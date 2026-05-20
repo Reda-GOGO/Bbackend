@@ -26,7 +26,7 @@ router.post("/login", async (req, res) => {
     httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
     sameSite: "lax",
     secure: false,
-    maxAge: 24 * 60 * 60 * 1000, // 1 hour in milliseconds
+    maxAge: 3 * 24 * 60 * 60 * 1000, // 1 hour in milliseconds
   });
 
   // Send a success message or user data back to the client

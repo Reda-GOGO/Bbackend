@@ -44,10 +44,44 @@ router.post("/", upload.single("image"), async (req, res) => {
 // GET ALL collections
 router.get("/", async (req, res) => {
   try {
+    let where = {};
+    const search = req.query.search ? req.query.search.trim() : "";
+    const page = req.query.page ? parseInt(req.query.page) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+    const filter = req.query.filter_by ? req.query.filter_by.trim() : "all";
+    const skip = (page - 1) * limit;
+    const totalItems = await database.collection.count();
+    if (search) {
+      where = {
+        name: { contains: search },
+      }
+    }
+    switch (filter) {
+      case "all":
+        break;
+      case "active":
+        where.archived = false;
+        break;
+      case "archived":
+        where.archived = true;
+        break;
+      default:
+        break;
+    }
+    const totalResults = await database.collection.count({ where });
     const collections = await database.collection.findMany({
+      where,
+      skip,
+      take: limit,
       include: { _count: { select: { products: true } } }, // Returns product count
     });
-    res.json({ collections });
+    res.json({
+      collections,
+      totalPages: Math.ceil(totalResults / limit),
+      currentPage: page,
+      totalCount: totalResults,
+      totalItems,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -59,7 +93,34 @@ router.get("/:handle", async (req, res) => {
     const { handle } = req.params;
     const collection = await database.collection.findUnique({
       where: { handle },
-      include: { products: true },
+      include: {
+        products: {
+          select: {
+            id: true,
+            name: true,
+            handle: true,
+            description: true,
+            price: true,
+            cost: true,
+            unit: true,
+            vendorName: true,
+            vendorContact: true,
+            availableQty: true,
+            image: true,
+            units: {
+              select: {
+                name: true,
+                quantityInBase: true,
+                defaultValue: true,
+                variantValue: true,
+                price: true,
+                cost: true,
+                isBase: true,
+              },
+            },
+          },
+        }
+      },
     });
 
     if (!collection)
@@ -74,7 +135,7 @@ router.get("/:handle", async (req, res) => {
 router.put("/:handle", upload.single("image"), async (req, res) => {
   try {
     const { handle } = req.params;
-    const { name, description, productIds } = req.body;
+    const { name, description, products, archived } = req.body;
 
     const updateData = {
       name,
@@ -83,15 +144,22 @@ router.put("/:handle", upload.single("image"), async (req, res) => {
 
     if (req.file) {
       updateData.image = `/uploads/${req.file.filename}`;
+    } else {
+      updateData.image = req.body.image ? req.body.image : null;
     }
 
-    if (productIds) {
+    if (products) {
       // "set" replaces existing products with the new list
       updateData.products = {
-        set: JSON.parse(productIds).map((id) => ({ id: parseInt(id) })),
-      };
-    }
+        set: JSON.parse(products).map((product) => ({
+          id: product.id,
+        })),
+      }
 
+    }
+    if (archived) {
+      updateData.archived = archived === "true" ? true : false;
+    }
     const updated = await database.collection.update({
       where: { handle },
       data: updateData,

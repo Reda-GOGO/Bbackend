@@ -226,6 +226,8 @@ router.get("/", async (req, res, next) => {
     const sort_by = req.query.sort_by || "createdAt";
     const sort_direction = req.query.sort_direction || "desc";
     const filter_by = req.query.filter_by || "active";
+    const type = req.query.type || "all";
+    const status = req.query.status || "all";
 
     const skip = (page - 1) * limit;
 
@@ -249,6 +251,13 @@ router.get("/", async (req, res, next) => {
         break;
       case "all":
         break;
+    }
+
+    if (type !== "all") {
+      where = { ...where, type: type };
+    }
+    if (status !== "all") {
+      where = { ...where, status: status };
     }
 
     // total count for pagination
