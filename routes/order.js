@@ -272,7 +272,11 @@ router.get("/", async (req, res, next) => {
         customer: true,
         items: {
           include: {
-            product: true,
+            product: {
+              include: {
+                units: true,
+              }
+            },
             productUnit: true,
           },
         },
@@ -319,5 +323,24 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch order ..." });
   }
 });
+
+
+router.delete("/:id", async (req, res, next) => {
+  const { id } = req.params;
+  try {
+    await database.order.update({
+      where: {
+        id
+      },
+      data: {
+        deleted: true,
+      }
+    })
+
+  } catch (error) {
+    next(error)
+  }
+
+})
 
 export default router;

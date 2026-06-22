@@ -175,8 +175,11 @@ router.put("/:handle", upload.single("image"), async (req, res) => {
 router.delete("/:handle", async (req, res) => {
   try {
     const { handle } = req.params;
-    await database.collection.delete({
+    await database.collection.update({
       where: { handle },
+      data: {
+        archived: true,
+      }
     });
     res.status(204).send();
   } catch (error) {
